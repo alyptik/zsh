@@ -927,11 +927,25 @@ isrelative(char *s)
 mod_export Cmdnam
 hashcmd(char *arg0, char **pp)
 {
+    /*
+     * avoid stack-based buffer overflow vulnerability by
+     * giving buf static storage duration (memset() before
+     * returning to caller in order to keep buf zero'd
+     * shouldn't be too painful).
+     *
+     * fixes CVE-2018-1071:
+     * https://access.redhat.com/security/cve/cve-2018-1071
+     * https://bugzilla.redhat.com/show_bug.cgi?id=1553531
+     *
+     * FIXME(?):
+     * needs _reliable_ confirmation of (non)existence :(
+     * -alyptik
+     */
+    static char buf[PATH_MAX + 1];
+    char *s, **pq;
     Cmdnam cn;
-    char *s, buf[PATH_MAX+1];
-    char **pq;
 
-    for (; *pp; pp++)
+    for (; *pp; pp++) {
 	if (**pp == '/') {
 	    s = buf;
 	    strucpy(&s, *pp);
@@ -942,6 +956,10 @@ hashcmd(char *arg0, char **pp)
 	    if (iscom(buf))
 		break;
 	}
+    }
+
+    /* cleanup buf for subsequent calls */
+    memset(buf, 0, sizeof buf);
 
     if (!*pp)
 	return NULL;
