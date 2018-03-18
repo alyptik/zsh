@@ -137,7 +137,7 @@ mod_export char *
 shingetline(void)
 {
     char *line = NULL;
-    int ll = 0;
+    int llen = 0, bufsz = 0;
     int c;
     char buf[BUFSIZ];
     char *p;
@@ -159,8 +159,8 @@ shingetline(void)
 		*p++ = '\n';
 	    if (p > buf) {
 		*p++ = '\0';
-		line = zrealloc(line, ll + (p - buf));
-		memcpy(line + ll, buf, p - buf);
+		line = zrealloc(line, llen + (p - buf));
+		memcpy(line + llen, buf, p - buf);
 	    }
 	    return line;
 	}
@@ -172,10 +172,13 @@ shingetline(void)
 	if (p >= buf + BUFSIZ - 1) {
 	    winch_block();
 	    queue_signals();
-	    line = zrealloc(line, ll + (p - buf) + 1);
-	    memcpy(line + ll, buf, p - buf);
-	    ll += p - buf;
-	    line[ll] = '\0';
+	    if (bufsz <= llen) {
+		bufsz = (llen + (p - buf) + 1) * 2;
+		line = zrealloc(line, bufsz);
+	    }
+	    memcpy(line + llen, buf, p - buf);
+	    llen += p - buf;
+	    line[llen] = '\0';
 	    p = buf;
 	    winch_unblock();
 	    dont_queue_signals();
