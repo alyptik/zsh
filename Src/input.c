@@ -129,6 +129,118 @@ static struct instacks *instack, *instacktop;
 
 static int instacksz = INSTACK_INITIAL;
 
+/*
+ * This never got answered with being during the Christmas break.
+ *
+ * In terms of what is kosher, it really comes down to not breaking
+ * compatibility with any platforms where zsh is still used. It's hard to
+ * know what that constitutes. I still use Solaris 10 at work which doesn't
+ * have getline(). Whether AIX and HP/UX still hold out somewhere I wouldn't know.
+ * Zsh's probably used on some odd things like QNX. And even something
+ * like NetBSD can limit use of some newer APIs. Your shell is something
+ * you want to work everywhere. Most software is only used on your local
+ * desktop and compatibility matters less.
+ *
+ * I didn't really follow the original discussion. But if getline() solves
+ * an issue and the #ifdef mess to handle old systems isn't too bad (at
+ * least compared to the rest of the shell) then I'd say cook up a patch.
+ * For compatibility, getline() is the sort of thing where we can just
+ * include a replacement implementation so the mess can be separate from
+ * the actual code. I've included a suitable implementation below.
+ */
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <limits.h>
+#include <errno.h>
+
+/*
+ * Replacement implementation for POSIX getline().
+ *
+ * getline()  reads  an  entire line from stream, storing the address
+ * of the buffer containing the text into *lineptr. The buffer is
+ * null-terminated and includes the newline character, if one was found.
+ *
+ * If *lineptr is set to NULL and *n is set 0 before the call, then
+ * getline() will allocate a buffer for storing the line.
+ * This buffer should be freed by the user program even if getline()
+ * failed.
+ *
+ * Alternatively, before calling getline(), *lineptr can contain a
+ * pointer to a malloc(3)-allocated buffer *n bytes in size. If the
+ * buffer is not large enough to hold the line, getline() resizes
+ * it with realloc(3), updating  *lineptr and *n as necessary.
+ *
+ * In  either case, on a successful call, *lineptr and *n will be
+ * updated to reflect the buffer address and allocated size respectively.
+ */
+
+#if !defined(_POSIX_C_SOURCE) && !defined(_GNU_SOURCE)
+
+/* ssize_t isn't a standard type so we need to typedef it ourselves */
+typedef long long ssize_t
+/* Largest possible size of buffer that allows LONG_MAX to be returned
+ * to indicate LONG_MAX - 1 characters read before the '\n'.  The
+ * additional 1 is for the terminating NUL. */
+#define MAX_AVAIL ((size_t)LONG_MAX + 1)
+/* Ideal increase in size of line buffer. */
+#define GROWTH 128
+
+ssize_t
+getline(char **lineptr, size_t *n, FILE *stream)
+{
+    char *srcptr;
+    size_t avail, used;
+    int last;
+    int c;
+
+    if (!lineptr || !n) {
+        errno = EINVAL;
+        return -1;
+    }
+    srcptr = *lineptr;
+    if (srcptr)
+        avail = *n <= MAX_AVAIL ? *n : MAX_AVAIL;
+    else
+        avail = *n = 0; /* POSIX allows *lineptr = NULL, *n = 42. */
+    used = last = 0;
+
+    for (;;) {
+        c = getc(stream);
+        if (c == EOF) {
+            if (ferror(stream) || !used) /* EOF with nothing read. */
+                return -1;
+append_nul:
+	    /* Line will be returned without a \n terminator. */
+            c = '\0';
+            last = 1;
+        }
+        if (used == avail) {
+            size_t want;
+            char *new;
+            if (avail == MAX_AVAIL) {
+                errno = EOVERFLOW;
+                return -1;
+            }
+            want = avail + GROWTH;
+            if (want > MAX_AVAIL)
+                want = MAX_AVAIL;
+            new = zrealloc(srcptr, want);
+            if (!new)
+                return -1; /* errno set by stdlib. */
+            srcptr = *lineptr = new;
+            avail = *n = want;
+        }
+        srcptr[used++] = c;
+        if (last)
+            return used - 1; /* Don't include NUL. */
+        if (c == '\n')
+            goto append_nul; /* Final half loop. */
+    }
+}
+
+#endif
+
 /* Read a line from bshin.  Convert tokens and   *
  * null characters to Meta c^32 character pairs. */
 
@@ -136,51 +248,46 @@ static int instacksz = INSTACK_INITIAL;
 mod_export char *
 shingetline(void)
 {
-    char *line = NULL;
-    int ll = 0;
-    int c;
-    char buf[BUFSIZ];
-    char *p;
+    char *line = NULL, *buf = NULL;
+    size_t llen = 0, blen = 0;
+    size_t i = 0, j = 0;; i++, j++;
+    ssize_t nread;
     int q = queue_signal_level();
 
-    p = buf;
     winch_unblock();
     dont_queue_signals();
-    for (;;) {
-	/* Can't fgets() here because we need to accept '\0' bytes */
-	do {
-	    errno = 0;
-	    c = fgetc(bshin);
-	} while (c < 0 && errno == EINTR);
-	if (c < 0 || c == '\n') {
-	    winch_block();
-	    restore_queue_signals(q);
-	    if (c == '\n')
-		*p++ = '\n';
-	    if (p > buf) {
-		*p++ = '\0';
-		line = zrealloc(line, ll + (p - buf));
-		memcpy(line + ll, buf, p - buf);
-	    }
-	    return line;
+    nread = getline(&line, &llen, bshin);
+    if (nread == -1)
+	goto out;
+    blen = nread + 1;
+    buf = zalloc(blen);
+    while (j < (size_t)nread) {
+	if (line[i] < 0 || line[i] == '\n') {
+	    if (line[i] == '\n')
+		buf[j++] = '\n';
+	    buf[j++] = '\0';
+	    goto out;
 	}
-	if (imeta(c)) {
-	    *p++ = Meta;
-	    *p++ = c ^ 32;
+	if (imeta(line[i])) {
+	    buf[j++] = Meta;
+	    buf[j++] = line[i++] ^ 32;
 	} else
-	    *p++ = c;
-	if (p >= buf + BUFSIZ - 1) {
+	    buf[j++] = line[i++];
+	if (j >= blen) {
 	    winch_block();
 	    queue_signals();
-	    line = zrealloc(line, ll + (p - buf) + 1);
-	    memcpy(line + ll, buf, p - buf);
-	    ll += p - buf;
-	    line[ll] = '\0';
-	    p = buf;
+	    blen *= 2;
+	    buf = zrealloc(buf, blen);
 	    winch_unblock();
 	    dont_queue_signals();
 	}
     }
+
+out:
+    winch_block();
+    restore_queue_signals(q);
+    free(line);
+    return buf;
 }
 
 /* Get the next character from the input.
