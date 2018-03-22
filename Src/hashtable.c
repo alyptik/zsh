@@ -1303,11 +1303,23 @@ printaliasnode(HashNode hn, int printflags)
     }
 
     if (printflags & PRINT_LIST) {
-	/* Fast fail on unrepresentable values. */
+	/*
+	 * '=' aliases need to be special cased with direct alias
+	 * table assignment (`aliases[=]=...`). If the zsh/parameter
+	 * module isn't loaded just print a warning and fail.
+	 */
 	if (strchr(a->node.nam, '=')) {
-	    zwarn("invalid alias '%s' encountered while printing aliases", 
-		  a->node.nam);
-	    /* ### TODO: Return an error status to the C caller */
+	    /* Fast fail on unrepresentable values. */
+	    if (!module_loaded("zsh/parameter")) {
+		zwarn("invalid alias '%s' encountered while printing aliases",
+		 a->node.nam);
+		/* ### TODO: Return an error status to the C caller */
+		return;
+	    }
+
+	    printf("aliases[=]=");
+	    quotedzputs(a->text, stdout);
+	    putchar('\n');
 	    return;
 	}
 
