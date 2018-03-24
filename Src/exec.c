@@ -3455,6 +3455,7 @@ execcmd_exec(Estate state, Execcmd_params eparams,
 	if (type == WC_SUBSH && !(how & Z_ASYNC))
 	    flags |= ESUB_JOB_CONTROL;
 	filelist = jobtab[thisjob].filelist;
+	list_pipe_child = list_pipe;
 	entersubsh(flags);
 	close(synch[1]);
 	forked = 1;
