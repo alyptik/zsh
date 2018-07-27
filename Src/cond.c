@@ -30,6 +30,33 @@
 #include "zsh.mdh"
 #include "cond.pro"
 
+struct __stat {
+    __dev_t st_dev;		/* Device.  */
+    __ino_t st_ino;		/* File serial number.	*/
+    __nlink_t st_nlink;		/* Link count.  */
+    __mode_t st_mode;		/* File mode.  */
+    __uid_t st_uid;		/* User ID of the file's owner.	*/
+    __gid_t st_gid;		/* Group ID of the file's group.*/
+    int __pad0;
+    __dev_t st_rdev;		/* Device number, if device.  */
+    __off_t st_size;			/* Size of file, in bytes.  */
+    __blksize_t st_blksize;	/* Optimal block size for I/O.  */
+    __blkcnt_t st_blocks;		/* Number 512-byte blocks allocated. */
+    /* Nanosecond resolution timestamps are stored in a format
+       equivalent to 'struct timespec'.  This is the type used
+       whenever possible but the Unix namespace rules do not allow the
+       identifier 'timespec' to appear in the <sys/stat.h> header.
+       Therefore we have to handle the use of this header in strictly
+       standard-compliant sources special.  */
+    struct timespec st_atim;		/* Time of last access.  */
+    struct timespec st_mtim;		/* Time of last modification.  */
+    struct timespec st_ctim;		/* Time of last status change.  */
+#define st_atime st_atim.tv_sec	/* Backward compatibility.  */
+#define st_mtime st_mtim.tv_sec
+#define st_ctime st_ctim.tv_sec
+   long __glibc_reserved[3];
+};
+
 /**/
 int tracingcond;    /* updated by execcond() in exec.c */
 
@@ -69,7 +96,7 @@ static void cond_subst(char **strp, int glob_ok)
 int
 evalcond(Estate state, char *fromtest)
 {
-    struct stat *st;
+    struct __stat *st;
     char *left, *right, *overridename, overridebuf[13];
     Wordcode pcode;
     wordcode code;
@@ -445,10 +472,10 @@ doaccess(char *s, int c)
 }
 
 
-static struct stat st;
+static struct __stat st;
 
 /**/
-static struct stat *
+static struct __stat *
 getstat(char *s)
 {
     char *us;
@@ -456,14 +483,14 @@ getstat(char *s)
 /* /dev/fd/n refers to the open file descriptor n.  We always use fstat *
  * in this case since on Solaris /dev/fd/n is a device special file     */
     if (!strncmp(s, "/dev/fd/", 8)) {
-	if (fstat(atoi(s + 8), &st))
+	if (fstat(atoi(s + 8), (struct stat *)&st))
 	    return NULL;
         return &st;
     }
 
     if (!(us = unmeta(s)))
         return NULL;
-    if (stat(us, &st))
+    if (stat(us, (struct stat *)&st))
 	return NULL;
     return &st;
 }
@@ -473,7 +500,7 @@ getstat(char *s)
 static mode_t
 dostat(char *s)
 {
-    struct stat *statp;
+    struct __stat *statp;
 
     if (!(statp = getstat(s)))
 	return 0;
@@ -487,7 +514,7 @@ dostat(char *s)
 static mode_t
 dolstat(char *s)
 {
-    if (lstat(unmeta(s), &st) < 0)
+    if (lstat(unmeta(s), (struct stat *)&st) < 0)
 	return 0;
     return st.st_mode;
 }

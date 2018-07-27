@@ -30,6 +30,12 @@
 #include "zsh.mdh"
 #include "compat.pro"
 
+struct __timezone {
+	int     tz_minuteswest; /* minutes west of Greenwich */
+	int     tz_dsttime;     /* type of dst correction */
+};
+#define timezone __timezone
+
 /* Return pointer to first occurence of string t *
  * in string s.  Return NULL if not present.     */
 

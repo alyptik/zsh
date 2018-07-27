@@ -30,6 +30,12 @@
 #include "zsh.mdh"
 #include "exec.pro"
 
+struct __timezone {
+	int     tz_minuteswest; /* minutes west of Greenwich */
+	int     tz_dsttime;     /* type of dst correction */
+};
+#define timezone __timezone
+
 /* Flags for last argument of addvars */
 
 enum {
