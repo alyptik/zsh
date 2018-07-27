@@ -569,6 +569,25 @@ putpromptchar(int doprint, int endchar, unsigned int *txtchangep)
 		txtunset(TXT_ATTR_BG_ON_MASK);
 		set_colour_attribute(TXTNOBGCOLOUR, COL_SEQ_BG, TSC_PROMPT);
 		break;
+	    case 'O':
+		txtchangeset(txtchangep, TXTNOFGCOLOUR, TXT_ATTR_FG_ON_MASK);
+		txtchangeset(txtchangep, TXTNOBGCOLOUR, TXT_ATTR_BG_ON_MASK);
+		txtunset(TXT_ATTR_FG_ON_MASK);
+		txtunset(TXT_ATTR_BG_ON_MASK);
+		set_colour_attribute(TXTNOFGCOLOUR, COL_SEQ_FG, TSC_PROMPT);
+		set_colour_attribute(TXTNOBGCOLOUR, COL_SEQ_BG, TSC_PROMPT);
+		break;
+	    case 'o':
+		txtchangeset(txtchangep, TXTNOUNDERLINE, TXTUNDERLINE);
+		txtchangeset(txtchangep, TXTNOSTANDOUT, TXTSTANDOUT);
+		txtchangeset(txtchangep, TXTNOBOLDFACE, TXTBOLDFACE);
+		txtunset(TXTUNDERLINE);
+		txtunset(TXTSTANDOUT);
+		txtunset(TXTBOLDFACE);
+		tsetcap(TCUNDERLINEEND, TSC_PROMPT|TSC_DIRTY);
+		tsetcap(TCSTANDOUTEND, TSC_PROMPT|TSC_DIRTY);
+		tsetcap(TCALLATTRSOFF, TSC_PROMPT|TSC_DIRTY);
+		break;
 	    case '[':
 		if (idigit(*++bv->fm))
 		    arg = zstrtol(bv->fm, &bv->fm, 10);

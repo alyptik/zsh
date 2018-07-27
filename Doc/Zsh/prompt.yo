@@ -246,6 +246,12 @@ item(tt(%K) LPAR()tt(%k)RPAR())(
 Start (stop) using a different bacKground colour.  The syntax is
 identical to that for tt(%F) and tt(%f).
 )
+item(tt(%O))(
+Reset foreground and background colours to default.
+)
+item(tt(%o))(
+Turn off all terminal attributes (underline/standout/boldface).
+)
 item(tt(%{)...tt(%}))(
 Include a string as a literal escape sequence.
 The string within the braces should not change the cursor
