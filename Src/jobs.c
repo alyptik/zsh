@@ -30,6 +30,12 @@
 #include "zsh.mdh"
 #include "jobs.pro"
 
+struct __timezone {
+	int     tz_minuteswest; /* minutes west of Greenwich */
+	int     tz_dsttime;     /* type of dst correction */
+};
+#define timezone __timezone
+
 /* the process group of the shell at startup (equal to mypgprp, except
    when we started without being process group leader */
 
@@ -2841,11 +2847,13 @@ acquire_pgrp(void)
 
     if ((mypgrp = GETPGRP()) >= 0) {
 	long lastpgrp = mypgrp;
-	sigemptyset(&blockset);
-	sigaddset(&blockset, SIGTTIN);
-	sigaddset(&blockset, SIGTTOU);
-	sigaddset(&blockset, SIGTSTP);
-	oldset = signal_block(blockset);
+	/*
+	 * sigemptyset(&blockset);
+	 * sigaddset(&blockset, SIGTTIN);
+	 * sigaddset(&blockset, SIGTTOU);
+	 * sigaddset(&blockset, SIGTSTP);
+	 */
+	sigprocmask(SIG_BLOCK, &blockset, &oldset);
 	while ((ttpgrp = gettygrp()) != -1 && ttpgrp != mypgrp) {
 	    mypgrp = GETPGRP();
 	    if (mypgrp == mypid) {
@@ -2853,13 +2861,13 @@ acquire_pgrp(void)
 		    break; /* attachtty() will be a no-op, give up */
 		signal_setmask(oldset);
 		attachtty(mypgrp); /* Might generate SIGT* */
-		signal_block(blockset);
+		sigprocmask(SIG_BLOCK, &blockset, NULL);
 	    }
 	    if (mypgrp == gettygrp())
 		break;
 	    signal_setmask(oldset);
 	    if (read(0, NULL, 0) != 0) {} /* Might generate SIGT* */
-	    signal_block(blockset);
+	    sigprocmask(SIG_BLOCK, &blockset, NULL);
 	    mypgrp = GETPGRP();
 	    if (mypgrp == lastpgrp && !interact)
 		break; /* Unlikely that pgrp will ever change */

@@ -108,18 +108,6 @@ zgettime(struct timespec *ts)
 {
     int ret = -1;
 
-#ifdef HAVE_CLOCK_GETTIME
-    struct timespec dts;
-    if (clock_gettime(CLOCK_REALTIME, &dts) < 0) {
-	zwarn("unable to retrieve time: %e", errno);
-	ret--;
-    } else {
-	ret++;
-	ts->tv_sec = (time_t) dts.tv_sec;
-	ts->tv_nsec = (long) dts.tv_nsec;
-    }
-#endif
-
     if (ret) {
 	struct timeval dtv;
 	struct timezone dtz;

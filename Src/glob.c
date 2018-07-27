@@ -30,33 +30,6 @@
 #include "zsh.mdh"
 #include "glob.pro"
 
-struct __stat {
-    __dev_t st_dev;		/* Device.  */
-    __ino_t st_ino;		/* File serial number.	*/
-    __nlink_t st_nlink;		/* Link count.  */
-    __mode_t st_mode;		/* File mode.  */
-    __uid_t st_uid;		/* User ID of the file's owner.	*/
-    __gid_t st_gid;		/* Group ID of the file's group.*/
-    int __pad0;
-    __dev_t st_rdev;		/* Device number, if device.  */
-    __off_t st_size;			/* Size of file, in bytes.  */
-    __blksize_t st_blksize;	/* Optimal block size for I/O.  */
-    __blkcnt_t st_blocks;		/* Number 512-byte blocks allocated. */
-    /* Nanosecond resolution timestamps are stored in a format
-       equivalent to 'struct timespec'.  This is the type used
-       whenever possible but the Unix namespace rules do not allow the
-       identifier 'timespec' to appear in the <sys/stat.h> header.
-       Therefore we have to handle the use of this header in strictly
-       standard-compliant sources special.  */
-    struct timespec st_atim;		/* Time of last access.  */
-    struct timespec st_mtim;		/* Time of last modification.  */
-    struct timespec st_ctim;		/* Time of last status change.  */
-#define st_atime st_atim.tv_sec	/* Backward compatibility.  */
-#define st_mtime st_mtim.tv_sec
-#define st_ctime st_ctim.tv_sec
-   long __glibc_reserved[3];
-};
-
 #if defined(OFF_T_IS_64_BIT) && defined(__GNUC__)
 # define ALIGN64 __attribute__((aligned(8)))
 #else
@@ -141,7 +114,7 @@ int pathpos;		/* position in pathbuf (needed by pattern code) */
 /**/
 char *pathbuf;
 
-typedef struct __stat *Statptr;	 /* This makes the Ultrix compiler happy.  Go figure. */
+typedef struct stat *Statptr;	 /* This makes the Ultrix compiler happy.  Go figure. */
 
 /* modifier for unit conversions */
 
@@ -160,7 +133,7 @@ typedef struct __stat *Statptr;	 /* This makes the Ultrix compiler happy.  Go fi
 #define TT_TERABYTES 5
 
 
-typedef int (*TestMatchFunc) _((char *, struct __stat *, off_t, char *));
+typedef int (*TestMatchFunc) _((char *, struct stat *, off_t, char *));
 
 struct qual {
     struct qual *next;		/* Next qualifier, must match                */
@@ -308,7 +281,7 @@ addpath(char *s, int l)
 
 /**/
 static int
-statfullpath(const char *s, struct __stat *st, int l)
+statfullpath(const char *s, struct stat *st, int l)
 {
     char buf[PATH_MAX+1];
 
@@ -344,7 +317,7 @@ static char **inserts;
 static void
 insert(char *s, int checked)
 {
-    struct __stat buf, buf2, *bp;
+    struct stat buf, buf2, *bp;
     char *news = s;
     int statted = 0;
 
@@ -448,15 +421,6 @@ insert(char *s, int checked)
 	    matchptr->mtime = buf.st_mtime;
 	    matchptr->ctime = buf.st_ctime;
 	    matchptr->links = buf.st_nlink;
-#ifdef GET_ST_ATIME_NSEC
-	    matchptr->ansec = GET_ST_ATIME_NSEC(buf);
-#endif
-#ifdef GET_ST_MTIME_NSEC
-	    matchptr->mnsec = GET_ST_MTIME_NSEC(buf);
-#endif
-#ifdef GET_ST_CTIME_NSEC
-	    matchptr->cnsec = GET_ST_CTIME_NSEC(buf);
-#endif
 	}
 	if (statted & 2) {
 	    matchptr->_size = buf2.st_size;
@@ -464,15 +428,6 @@ insert(char *s, int checked)
 	    matchptr->_mtime = buf2.st_mtime;
 	    matchptr->_ctime = buf2.st_ctime;
 	    matchptr->_links = buf2.st_nlink;
-#ifdef GET_ST_ATIME_NSEC
-	    matchptr->_ansec = GET_ST_ATIME_NSEC(buf2);
-#endif
-#ifdef GET_ST_MTIME_NSEC
-	    matchptr->_mnsec = GET_ST_MTIME_NSEC(buf2);
-#endif
-#ifdef GET_ST_CTIME_NSEC
-	    matchptr->_cnsec = GET_ST_CTIME_NSEC(buf2);
-#endif
 	}
 	matchptr++;
 
@@ -551,7 +506,7 @@ scanner(Complist q, int shortcircuit)
 		    if (!strcmp(str, "."))
 			add = 0;
 		    else if (!strcmp(str, "..")) {
-			struct __stat sc, sr;
+			struct stat sc, sr;
 
 			add = (stat("/", (struct stat *)&sr) || stat(unmeta(pathbuf), (struct stat *)&sc) ||
 			       sr.st_ino != sc.st_ino ||
@@ -640,7 +595,7 @@ scanner(Complist q, int shortcircuit)
 		    }
 		    if (closure) {
 			/* if matching multiple directories */
-			struct __stat buf;
+			struct stat buf;
 
 			if (statfullpath(fn, &buf, !q->follow)) {
 			    if (errno != ENOENT && errno != EINTR &&
@@ -3652,7 +3607,7 @@ remnulargs(char *s)
 
 /**/
 static int
-qualdev(UNUSED(char *name), struct __stat *buf, off_t dv, UNUSED(char *dummy))
+qualdev(UNUSED(char *name), struct stat *buf, off_t dv, UNUSED(char *dummy))
 {
     return (off_t)buf->st_dev == dv;
 }
@@ -3661,7 +3616,7 @@ qualdev(UNUSED(char *name), struct __stat *buf, off_t dv, UNUSED(char *dummy))
 
 /**/
 static int
-qualnlink(UNUSED(char *name), struct __stat *buf, off_t ct, UNUSED(char *dummy))
+qualnlink(UNUSED(char *name), struct stat *buf, off_t ct, UNUSED(char *dummy))
 {
     return (g_range < 0 ? buf->st_nlink < ct :
 	    g_range > 0 ? buf->st_nlink > ct :
@@ -3672,7 +3627,7 @@ qualnlink(UNUSED(char *name), struct __stat *buf, off_t ct, UNUSED(char *dummy))
 
 /**/
 static int
-qualuid(UNUSED(char *name), struct __stat *buf, off_t uid, UNUSED(char *dummy))
+qualuid(UNUSED(char *name), struct stat *buf, off_t uid, UNUSED(char *dummy))
 {
     return buf->st_uid == uid;
 }
@@ -3681,7 +3636,7 @@ qualuid(UNUSED(char *name), struct __stat *buf, off_t uid, UNUSED(char *dummy))
 
 /**/
 static int
-qualgid(UNUSED(char *name), struct __stat *buf, off_t gid, UNUSED(char *dummy))
+qualgid(UNUSED(char *name), struct stat *buf, off_t gid, UNUSED(char *dummy))
 {
     return buf->st_gid == gid;
 }
@@ -3690,7 +3645,7 @@ qualgid(UNUSED(char *name), struct __stat *buf, off_t gid, UNUSED(char *dummy))
 
 /**/
 static int
-qualisdev(UNUSED(char *name), struct __stat *buf, UNUSED(off_t junk), UNUSED(char *dummy))
+qualisdev(UNUSED(char *name), struct stat *buf, UNUSED(off_t junk), UNUSED(char *dummy))
 {
     return S_ISBLK(buf->st_mode) || S_ISCHR(buf->st_mode);
 }
@@ -3699,7 +3654,7 @@ qualisdev(UNUSED(char *name), struct __stat *buf, UNUSED(off_t junk), UNUSED(cha
 
 /**/
 static int
-qualisblk(UNUSED(char *name), struct __stat *buf, UNUSED(off_t junk), UNUSED(char *dummy))
+qualisblk(UNUSED(char *name), struct stat *buf, UNUSED(off_t junk), UNUSED(char *dummy))
 {
     return S_ISBLK(buf->st_mode);
 }
@@ -3708,7 +3663,7 @@ qualisblk(UNUSED(char *name), struct __stat *buf, UNUSED(off_t junk), UNUSED(cha
 
 /**/
 static int
-qualischr(UNUSED(char *name), struct __stat *buf, UNUSED(off_t junk), UNUSED(char *dummy))
+qualischr(UNUSED(char *name), struct stat *buf, UNUSED(off_t junk), UNUSED(char *dummy))
 {
     return S_ISCHR(buf->st_mode);
 }
@@ -3717,7 +3672,7 @@ qualischr(UNUSED(char *name), struct __stat *buf, UNUSED(off_t junk), UNUSED(cha
 
 /**/
 static int
-qualisdir(UNUSED(char *name), struct __stat *buf, UNUSED(off_t junk), UNUSED(char *dummy))
+qualisdir(UNUSED(char *name), struct stat *buf, UNUSED(off_t junk), UNUSED(char *dummy))
 {
     return S_ISDIR(buf->st_mode);
 }
@@ -3726,7 +3681,7 @@ qualisdir(UNUSED(char *name), struct __stat *buf, UNUSED(off_t junk), UNUSED(cha
 
 /**/
 static int
-qualisfifo(UNUSED(char *name), struct __stat *buf, UNUSED(off_t junk), UNUSED(char *dummy))
+qualisfifo(UNUSED(char *name), struct stat *buf, UNUSED(off_t junk), UNUSED(char *dummy))
 {
     return S_ISFIFO(buf->st_mode);
 }
@@ -3735,7 +3690,7 @@ qualisfifo(UNUSED(char *name), struct __stat *buf, UNUSED(off_t junk), UNUSED(ch
 
 /**/
 static int
-qualislnk(UNUSED(char *name), struct __stat *buf, UNUSED(off_t junk), UNUSED(char *dummy))
+qualislnk(UNUSED(char *name), struct stat *buf, UNUSED(off_t junk), UNUSED(char *dummy))
 {
     return S_ISLNK(buf->st_mode);
 }
@@ -3744,7 +3699,7 @@ qualislnk(UNUSED(char *name), struct __stat *buf, UNUSED(off_t junk), UNUSED(cha
 
 /**/
 static int
-qualisreg(UNUSED(char *name), struct __stat *buf, UNUSED(off_t junk), UNUSED(char *dummy))
+qualisreg(UNUSED(char *name), struct stat *buf, UNUSED(off_t junk), UNUSED(char *dummy))
 {
     return S_ISREG(buf->st_mode);
 }
@@ -3753,7 +3708,7 @@ qualisreg(UNUSED(char *name), struct __stat *buf, UNUSED(off_t junk), UNUSED(cha
 
 /**/
 static int
-qualissock(UNUSED(char *name), struct __stat *buf, UNUSED(off_t junk), UNUSED(char *dummy))
+qualissock(UNUSED(char *name), struct stat *buf, UNUSED(off_t junk), UNUSED(char *dummy))
 {
     return S_ISSOCK(buf->st_mode);
 }
@@ -3762,7 +3717,7 @@ qualissock(UNUSED(char *name), struct __stat *buf, UNUSED(off_t junk), UNUSED(ch
 
 /**/
 static int
-qualflags(UNUSED(char *name), struct __stat *buf, off_t mod, UNUSED(char *dummy))
+qualflags(UNUSED(char *name), struct stat *buf, off_t mod, UNUSED(char *dummy))
 {
     return mode_to_octal(buf->st_mode) & mod;
 }
@@ -3771,7 +3726,7 @@ qualflags(UNUSED(char *name), struct __stat *buf, off_t mod, UNUSED(char *dummy)
 
 /**/
 static int
-qualmodeflags(UNUSED(char *name), struct __stat *buf, off_t mod, UNUSED(char *dummy))
+qualmodeflags(UNUSED(char *name), struct stat *buf, off_t mod, UNUSED(char *dummy))
 {
     long v = mode_to_octal(buf->st_mode), y = mod & 07777, n = mod >> 12;
 
@@ -3782,7 +3737,7 @@ qualmodeflags(UNUSED(char *name), struct __stat *buf, off_t mod, UNUSED(char *du
 
 /**/
 static int
-qualiscom(UNUSED(char *name), struct __stat *buf, UNUSED(off_t mod), UNUSED(char *dummy))
+qualiscom(UNUSED(char *name), struct stat *buf, UNUSED(off_t mod), UNUSED(char *dummy))
 {
     return S_ISREG(buf->st_mode) && (buf->st_mode & S_IXUGO);
 }
@@ -3791,7 +3746,7 @@ qualiscom(UNUSED(char *name), struct __stat *buf, UNUSED(off_t mod), UNUSED(char
 
 /**/
 static int
-qualsize(UNUSED(char *name), struct __stat *buf, off_t size, UNUSED(char *dummy))
+qualsize(UNUSED(char *name), struct stat *buf, off_t size, UNUSED(char *dummy))
 {
 #if defined(ZSH_64_BIT_TYPE) || defined(LONG_IS_64_BIT)
 # define QS_CAST_SIZE()
@@ -3836,7 +3791,7 @@ qualsize(UNUSED(char *name), struct __stat *buf, off_t size, UNUSED(char *dummy)
 
 /**/
 static int
-qualtime(UNUSED(char *name), struct __stat *buf, off_t days, UNUSED(char *dummy))
+qualtime(UNUSED(char *name), struct stat *buf, off_t days, UNUSED(char *dummy))
 {
     time_t now, diff;
 
@@ -3871,7 +3826,7 @@ qualtime(UNUSED(char *name), struct __stat *buf, off_t days, UNUSED(char *dummy)
 
 /**/
 static int
-qualsheval(char *name, UNUSED(struct __stat *buf), UNUSED(off_t days), char *str)
+qualsheval(char *name, UNUSED(struct stat *buf), UNUSED(off_t days), char *str)
 {
     Eprog prog;
 
@@ -3912,7 +3867,7 @@ qualsheval(char *name, UNUSED(struct __stat *buf), UNUSED(off_t days), char *str
 
 /**/
 static int
-qualnonemptydir(char *name, struct __stat *buf, UNUSED(off_t days), UNUSED(char *str))
+qualnonemptydir(char *name, struct stat *buf, UNUSED(off_t days), UNUSED(char *str))
 {
     DIR *dirh;
     struct dirent *de;

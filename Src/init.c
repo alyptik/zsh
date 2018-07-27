@@ -36,6 +36,13 @@
 
 #include "version.h"
 
+struct __timezone {
+	int     tz_minuteswest; /* minutes west of Greenwich */
+	int     tz_dsttime;     /* type of dst correction */
+};
+#define timezone __timezone
+#define NSIG _NSIG
+
 /**/
 int noexitct = 0;
 

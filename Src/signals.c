@@ -124,38 +124,7 @@ static sigset_t blocked_set;
 mod_export void
 install_handler(int sig)
 {
-#ifdef POSIX_SIGNALS
-    struct sigaction act;
- 
-    act.sa_handler = (SIGNAL_HANDTYPE) zhandler;
-    sigemptyset(&act.sa_mask);        /* only block sig while in handler */
-    act.sa_flags = 0;
-# ifdef SA_INTERRUPT                  /* SunOS 4.x */
-    if (interact)
-        act.sa_flags |= SA_INTERRUPT; /* make sure system calls are not restarted */
-# endif
-    sigaction(sig, &act, (struct sigaction *)NULL);
-#else
-# ifdef BSD_SIGNALS
-    struct sigvec vec;
- 
-    vec.sv_handler = (SIGNAL_HANDTYPE) zhandler;
-    vec.sv_mask = sigmask(sig);    /* mask out this signal while in handler    */
-#  ifdef SV_INTERRUPT
-    vec.sv_flags = SV_INTERRUPT;   /* make sure system calls are not restarted */
-#  endif
-    sigvec(sig, &vec, (struct sigvec *)NULL);
-# else
-#  ifdef SYSV_SIGNALS
-    /* we want sigset rather than signal because it will   *
-     * block sig while in handler.  signal usually doesn't */
-    sigset(sig, zhandler);
-#  else  /* NO_SIGNAL_BLOCKING (bummer) */
     signal(sig, zhandler);
-
-#  endif /* SYSV_SIGNALS  */
-# endif  /* BSD_SIGNALS   */
-#endif   /* POSIX_SIGNALS */
 }
 
 /* enable ^C interrupts */
@@ -186,7 +155,7 @@ mod_export void
 holdintr(void)
 {
     if (interact)
-        signal_block(signal_mask(SIGINT));
+        sigprocmask(SIG_BLOCK, signal_mask(SIGINT), NULL);
 }
 
 /* release ^C interrupts */
@@ -206,7 +175,7 @@ noholdintr(void)
 mod_export sigset_t
 signal_mask(int sig)
 {
-    sigset_t set;
+    sigset_t set = {0};
  
     sigemptyset(&set);
     if (sig)

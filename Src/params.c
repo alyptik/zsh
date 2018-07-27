@@ -44,6 +44,12 @@
 #endif
 #endif
 
+struct __timezone {
+	int     tz_minuteswest; /* minutes west of Greenwich */
+	int     tz_dsttime;     /* type of dst correction */
+};
+#define timezone __timezone
+
 /* what level of localness we are at */
  
 /**/
