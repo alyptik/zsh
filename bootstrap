@@ -1,0 +1,15 @@
+#!/bin/bash
+
+if [[ "$*" =~ \b(-h|--help)\b ]]; then
+	./configure --help
+	exit 1
+fi
+
+export CC=x86_64-nacl-gcc CC_FOR_BUILD=x86_64-nacl-gcc
+export CXX=x86_64-nacl-g++ CXX_FOR_BUILD=x86_64-nacl-g++
+export LD=x86_64-nacl-ld LD_FOR_BUILD=x86_64-nacl-ld
+export CFLAGS=-fno-pie CXXFLAGS=-fno-pie LDFLAGS=-fno-pie
+export LIBS="${LDLIBS:--L../build/ncurses/lib -l:libncurses.a}"
+export CHOST=x86_64-pc-nacl
+
+./configure --disable-dynamic --disable-gdbm --enable-etcdir=/etc/zsh --enable-zshenv=/etc/zsh/zshenv --enable-zlogin=/etc/zsh/zlogin --enable-zlogout=/etc/zsh/zlogout --enable-zprofile=/etc/zsh/zprofile --enable-zshrc=/etc/zsh/zshrc --enable-function-subdirs --with-tcsetpgrp --enable-cap --enable-zsh-secure-free --enable-zsh-debug --with-term-lib=ncurses --host=x86_64-pc-nacl "$@"
